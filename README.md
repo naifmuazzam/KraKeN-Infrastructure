@@ -100,7 +100,7 @@ Topics include:
 * [x] UFW firewall
 * [x] Docker Engine and Compose
 * [x] WireGuard VPS configuration
-* [ ] Docker service architecture
+* [x] Docker service architecture
 * [ ] Monitoring stack
 * [ ] Reverse proxy and HTTPS
 * [ ] KraKeN OpenVPN
