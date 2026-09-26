@@ -931,9 +931,9 @@ The monitoring architecture follows these principles:
 
 ## Phase 3 Roadmap
 
-* [ ] Prometheus
-* [ ] Node Exporter
-* [ ] cAdvisor
+* [x] Prometheus
+* [x] Node Exporter
+* [x] cAdvisor
 * [ ] Grafana
 * [ ] Basic dashboards
 * [ ] Alertmanager
