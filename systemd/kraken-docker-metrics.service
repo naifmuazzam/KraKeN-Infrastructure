@@ -1,0 +1,9 @@
+[Unit]
+Description=Generate KraKeN Docker Prometheus metrics
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/kraken/scripts/docker-metrics.sh
+

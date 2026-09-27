@@ -934,8 +934,8 @@ The monitoring architecture follows these principles:
 * [x] Prometheus
 * [x] Node Exporter
 * [x] cAdvisor
-* [ ] Grafana
-* [ ] Basic dashboards
+* [x] Grafana
+* [x] Basic dashboards
 * [ ] Alertmanager
 * [ ] Telegram notifications
 * [ ] Application metrics
