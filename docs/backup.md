@@ -379,14 +379,14 @@ The recovery test will be performed without relying on the original backup sourc
 * [x] Define backup destinations
 * [x] Define retention policy
 * [x] Design backup architecture
-* [ ] Implement backup script
+* [x] Implement backup script
 * [ ] Implement encryption
-* [ ] Implement checksum and manifest
+* [x] Implement checksum and manifest
 * [ ] Configure Cloudflare R2 upload
 * [ ] Implement retention automation
 * [ ] Document restore procedure
 * [ ] Perform recovery test
-* [ ] Finalize Phase 4 documentation
+* [x] Finalize Phase 4 documentation
 
 ---
 
