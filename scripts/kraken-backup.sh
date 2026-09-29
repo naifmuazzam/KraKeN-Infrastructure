@@ -73,11 +73,11 @@ echo
 echo "[3/5] Creating compressed archive..."
 
 tar \
-    --exclude='./backups' \
-    --exclude='./compose/.env' \
-    --exclude='./secrets' \
-    --exclude='./data/prometheus/lock' \
-    --exclude='./data/prometheus/queries.active' \
+    --exclude='kraken/backups' \
+    --exclude='kraken/compose/.env' \
+    --exclude='kraken/secrets' \
+    --exclude='kraken/data/prometheus/lock' \
+    --exclude='kraken/data/prometheus/queries.active' \
     -C /opt \
     -cf - kraken \
     | zstd -T0 -19 -o "${ARCHIVE}"
