@@ -382,7 +382,7 @@ The recovery test will be performed without relying on the original backup sourc
 * [x] Implement backup script
 * [x] Implement encryption
 * [x] Implement checksum and manifest
-* [ ] Configure Cloudflare R2 upload
+* [x] Configure Cloudflare R2 upload
 * [ ] Implement retention automation
 * [x] Document restore procedure
 * [x] Perform recovery test
