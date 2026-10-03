@@ -96,19 +96,45 @@ Topics include:
 ## Roadmap
 
 * [x] VPS provisioning
+
 * [x] SSH hardening
+
 * [x] UFW firewall
+
 * [x] Docker Engine and Compose
+
 * [x] WireGuard VPS configuration
+
 * [x] Docker service architecture
-* [ ] Monitoring stack
-* [ ] Reverse proxy and HTTPS
+
+* [x] Monitoring stack — baseline
+
+* [x] Backup and recovery foundation
+
 * [ ] KraKeN OpenVPN
+
 * [ ] Remote lab WireGuard connectivity
+
 * [ ] Network segmentation
-* [ ] AI gateway
+
+* [ ] Application services
+
+* [ ] AI gateway / Hermes
+
 * [ ] Infrastructure automation with Ansible
-* [ ] CI/CD and backup automation
+
+* [ ] CI/CD automation
+
+* [ ] Monitoring expansion and final observability
+
+  * [ ] Alertmanager
+  * [ ] Telegram notifications
+  * [ ] Application metrics
+  * [ ] VPN metrics
+  * [ ] Backup monitoring
+  * [ ] Hermes integration
+  * [ ] Grafana dashboard polish
+  * [ ] End-to-end alert testing
 
 ## Disclaimer
 

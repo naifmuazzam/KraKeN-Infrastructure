@@ -929,19 +929,25 @@ The monitoring architecture follows these principles:
 
 ---
 
-## Phase 3 Roadmap
+## Phase 3 — Monitoring Baseline
 
 * [x] Prometheus
+
 * [x] Node Exporter
+
 * [x] cAdvisor
+
 * [x] Grafana
+
 * [x] Basic dashboards
-* [ ] Alertmanager
-* [ ] Telegram notifications
-* [ ] Application metrics
-* [ ] VPN metrics
-* [ ] Backup monitoring
-* [ ] Hermes integration
+
+* [x] Custom Docker metrics
+
+* [x] Automated Docker metrics collection
+
+* [x] Monitoring network architecture
+
+* [x] Monitoring baseline validation
 
 ---
 
