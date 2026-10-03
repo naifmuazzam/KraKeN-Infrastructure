@@ -89,11 +89,11 @@ The following data is excluded from normal backup archives:
 
 The backup destination must not recursively back up itself.
 
-Transient Prometheus runtime files are also excluded where appropriate, including:
+Transient Prometheus runtime files are also excluded:
 
 ```text
-lock
-queries.active
+/opt/kraken/data/prometheus/lock
+/opt/kraken/data/prometheus/queries.active
 ```
 
 Other temporary files, runtime state, Docker image caches, stopped containers, and container runtime metadata are not considered part of the infrastructure backup.
@@ -106,7 +106,7 @@ Docker named volumes are currently not present on the VPS. Persistent applicatio
 
 Secrets are handled separately from the normal infrastructure archive.
 
-Sensitive files may include:
+Sensitive files include:
 
 ```text
 /opt/kraken/compose/.env
@@ -122,6 +122,20 @@ Secrets must:
 * Be encrypted when included in disaster-recovery backups
 
 The repository provides configuration templates such as `.env.example` rather than real credentials.
+
+The R2 credentials are stored only on the VPS under:
+
+```text
+/opt/kraken/secrets/r2.env
+```
+
+The backup encryption identity is stored separately under:
+
+```text
+/opt/kraken/secrets/backup.agekey
+```
+
+These files are excluded from the normal backup archive and are protected using restrictive filesystem permissions.
 
 ---
 
@@ -148,23 +162,41 @@ Local backups are not considered sufficient for disaster recovery because they r
 
 Cloudflare R2 is the off-site disaster-recovery destination.
 
-The R2 bucket will remain private and will use a bucket-scoped API credential with only the permissions required for backup operations.
+The R2 bucket is private and uses a dedicated bucket-scoped API credential with only the permissions required for backup operations.
 
-Planned permission scope:
+The configured permission scope is:
 
 ```text
 Object Read & Write
 ```
 
-The credential will be restricted to the dedicated KraKeN backup bucket.
+The credential is restricted to the dedicated KraKeN backup bucket:
 
-R2 credentials will be stored outside GitHub and handled as secrets on the VPS.
+```text
+kraken-infrastructure-backups
+```
+
+R2 credentials are stored outside GitHub and are never committed to the repository.
+
+Backups uploaded to R2 are encrypted with `age` before upload.
+
+R2 object keys use the following structure:
+
+```text
+YYYY/MM/kraken-backup-YYYY-MM-DD_HHMMSS.tar.zst.age
+```
+
+Example:
+
+```text
+2026/10/kraken-backup-2026-10-03_093528.tar.zst.age
+```
 
 ---
 
 ## Retention Policy
 
-The initial retention policy is:
+The retention policy is:
 
 | Backup Type | Retention |
 | ----------- | --------: |
@@ -174,41 +206,96 @@ The initial retention policy is:
 
 The same logical retention policy applies to both local backups and the R2 disaster-recovery repository.
 
-The retention process must only remove older backups after the newest backup has been successfully:
+Retention uses the timestamp embedded in the backup filename rather than filesystem modification time.
 
-1. Created
-2. Verified
-3. Stored locally
-4. Uploaded to R2
-5. Verified remotely
+### Retention Representatives
 
-A failed backup operation must not trigger destructive retention cleanup.
+Retention keeps the latest valid backup point representing each calendar period.
+
+For daily retention:
+
+```text
+Latest backup per calendar day
+```
+
+For weekly retention:
+
+```text
+Latest backup per ISO week
+```
+
+For monthly retention:
+
+```text
+Latest backup per calendar month
+```
+
+The retention system uses a union of these keep sets. A single backup may therefore satisfy multiple retention categories and is stored only once.
+
+For example, if the latest backup of the current week is also the latest backup of the current month, the same backup satisfies both roles.
+
+The system does not merge multiple backups into a weekly or monthly archive.
+
+### Retention Safety
+
+Retention cleanup is executed only after the backup operation has successfully:
+
+1. Created the backup
+2. Encrypted the backup
+3. Generated the checksum
+4. Verified the local backup
+5. Uploaded the encrypted backup to R2
+6. Verified the R2 object
+
+The backup system is implemented as a sequential systemd service:
+
+```text
+kraken-backup.sh
+      │
+      ├── Backup creation
+      ├── Encryption
+      ├── Checksum
+      ├── Verification
+      ├── R2 upload
+      └── R2 verification
+             │
+             ▼
+kraken-retention.sh
+      │
+      ├── Calculate retention set
+      ├── Remove expired local backups
+      └── Remove expired R2 objects
+```
+
+If the backup process exits with a non-zero status, the retention process is not executed.
+
+Retention is conservative: only recognized encrypted backup artifacts are considered authoritative recovery points.
 
 ---
 
 ## Archive Format
 
-Backups will use compressed archives:
+Backups are created using:
 
 ```text
 tar + zstd
 ```
 
-The resulting backup will then be encrypted before being stored as a disaster-recovery backup.
+The resulting archive is encrypted using `age` before being retained and uploaded to R2.
 
-Planned filename format:
+The authoritative backup filename format is:
 
 ```text
-kraken-backup-YYYY-MM-DD_HHMMSS.tar.zst.enc
+kraken-backup-YYYY-MM-DD_HHMMSS.tar.zst.age
 ```
 
 Example:
 
 ```text
-kraken-backup-2026-09-29_013000.tar.zst.enc
+kraken-backup-2026-10-03_093528.tar.zst.age
 ```
 
-Associated verification files:
+Associated verification files are:
 
 ```text
 kraken-backup-YYYY-MM-DD_HHMMSS.sha256
@@ -217,11 +304,13 @@ kraken-backup-YYYY-MM-DD_HHMMSS.manifest
 
 The manifest records the backup contents and provides an additional reference during restore operations.
 
+Only the encrypted `.tar.zst.age` artifact is considered an authoritative recovery point for retention purposes.
+
 ---
 
 ## Backup Flow
 
-The backup process is designed around the following sequence:
+The implemented backup process follows this sequence:
 
 ```text
 Validate Environment
@@ -230,66 +319,67 @@ Validate Environment
 Create Backup Timestamp
         │
         ▼
-Collect Backup Scope
-        │
-        ▼
-Exclude Runtime / Temporary Data
+Generate Manifest
         │
         ▼
 Create tar + zstd Archive
         │
         ▼
-Encrypt Backup
+Encrypt Backup with age
+        │
+        ▼
+Remove Unencrypted Archive
         │
         ▼
 Generate SHA-256 Checksum
         │
         ▼
-Generate Manifest
-        │
-        ▼
 Verify Backup
         │
         ▼
-Store Local Backup
-        │
-        ▼
-Upload to Cloudflare R2
+Upload Encrypted Backup to Cloudflare R2
         │
         ▼
 Verify R2 Object
         │
         ▼
+Backup Successful
+        │
+        ▼
 Apply Retention Policy
 ```
 
-Retention cleanup must occur only after successful backup and verification.
+The unencrypted intermediate archive is removed after successful encryption.
+
+Retention cleanup occurs only after the backup script completes successfully.
 
 ---
 
 ## Integrity Verification
 
-Each backup must have integrity information associated with it.
+Each encrypted backup has an associated SHA-256 checksum.
 
-SHA-256 checksums will be used to detect:
+SHA-256 checksums are used to detect:
 
 * Corrupted backup files
 * Incomplete transfers
 * Unexpected modifications
 
+The backup process verifies the generated encrypted archive against its checksum before considering the backup valid.
+
 Example:
 
 ```text
-backup archive
+Encrypted backup
       │
       ▼
 SHA-256 checksum
       │
       ▼
-stored with backup metadata
+Integrity verification
 ```
 
-The restore process must verify the checksum before attempting extraction.
+The restore process must verify the checksum before attempting decryption and extraction.
 
 ---
 
@@ -310,31 +400,31 @@ Examples of failure conditions include:
 
 When a failure occurs:
 
-* The script must return a non-zero exit status
-* The failed backup must not be treated as valid
-* Existing valid backups must not be deleted
-* Retention cleanup must not proceed
-* The failure should be logged for troubleshooting
+* The backup script returns a non-zero exit status
+* The failed backup is not treated as a valid recovery point
+* Existing valid backups are not deleted
+* The retention process is not started
+* The failure is available through systemd service logs for troubleshooting
+
+This ensures that an R2 failure cannot cause the retention process to remove existing recovery points.
 
 ---
 
 ## Restore Strategy
 
-Restore procedures will be documented after the backup implementation is completed.
-
-The intended recovery workflow is:
+The implemented restore workflow is:
 
 ```text
 Select Known-Good Backup
         │
         ▼
-Verify Checksum
+Verify SHA-256 Checksum
         │
         ▼
-Decrypt Backup
+Decrypt with age
         │
         ▼
-Extract Backup
+Test / Extract zstd Archive
         │
         ▼
 Restore Configuration
@@ -349,24 +439,32 @@ Restart Services
 Verify Infrastructure
 ```
 
-A backup will not be considered fully reliable until an actual restore test has been completed.
+The restore process was validated using a controlled recovery test.
 
 ---
 
 ## Recovery Testing
 
-The final Phase 4 validation will include a controlled recovery test.
+A controlled recovery test was performed using an encrypted backup.
 
-The test will verify that the backup can be used to restore:
+The test verified that the backup could be:
+
+* Decrypted successfully
+* Integrity-checked
+* Tested using `zstd`
+* Extracted successfully
+* Restored into an isolated test directory
+
+The recovery test covered the infrastructure backup structure including:
 
 * Docker Compose configuration
-* Prometheus configuration
+* Prometheus configuration and data
 * Grafana state
+* Node Exporter data
 * Custom monitoring scripts
 * Systemd automation
-* Persistent monitoring data where applicable
 
-The recovery test will be performed without relying on the original backup source being intact.
+The test was performed without modifying the production infrastructure.
 
 ---
 
@@ -383,7 +481,7 @@ The recovery test will be performed without relying on the original backup sourc
 * [x] Implement encryption
 * [x] Implement checksum and manifest
 * [x] Configure Cloudflare R2 upload
-* [ ] Implement retention automation
+* [x] Implement retention automation
 * [x] Document restore procedure
 * [x] Perform recovery test
 * [x] Finalize Phase 4 documentation
@@ -402,5 +500,6 @@ The KraKeN backup system follows these principles:
 6. **Backup verification must occur before retention cleanup.**
 7. **Failed backups must never trigger destructive cleanup.**
 8. **GitHub remains the source of truth for reproducible infrastructure code and configuration.**
-9. **Backup architecture should remain reproducible and automation-friendly.**
+9. **Retention is based on representative recovery points rather than simply deleting backups older than a fixed number of days.**
 10. **Recovery procedures must be tested before the backup system is considered complete.**
+11. **Backup and retention operations must remain reproducible and automation-friendly.**
